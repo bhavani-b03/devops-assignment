@@ -1,0 +1,57 @@
+#cloud-config
+
+package_update: true
+ssh_pwauth: true
+
+packages:
+  - docker.io
+  - git
+  - curl
+  - ffmpeg
+  - openssh-server
+
+users:
+  - name: testpress
+    groups: [sudo]
+    shell: /bin/bash
+    lock_passwd: false
+
+chpasswd:
+  expire: false
+  list: |
+    testpress:TestpressDemo123!
+
+write_files:
+  - path: /opt/testpress/app.env
+    permissions: '0644'
+    content: |
+      APP_NAME=Testpress
+      APP_ENV=development
+      PORT=8080
+
+  - path: /opt/testpress/index.html
+    permissions: '0644'
+    content: |
+      <html>
+        <body>
+          <h1>Hello from Testpress!</h1>
+        </body>
+      </html>
+
+  - path: /usr/local/bin/deploy-testpress.sh
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      docker rm -f testpress-app >/dev/null 2>&1 || true
+      docker run -d \
+        --name testpress-app \
+        --restart unless-stopped \
+        -p 8080:80 \
+        -v /opt/testpress/index.html:/usr/share/nginx/html/index.html:ro \
+        nginx:alpine
+
+runcmd:
+  - systemctl enable --now docker
+  - usermod -aG docker testpress
+  - chown -R testpress:testpress /opt/testpress
+  - /usr/local/bin/deploy-testpress.sh
